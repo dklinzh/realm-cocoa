@@ -42,6 +42,7 @@
 #include "shared_realm.hpp"
 
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/version.hpp>
 
 using namespace realm;
@@ -110,6 +111,7 @@ NSData *RLMRealmValidatedEncryptionKey(NSData *key) {
 
 @implementation RLMRealm {
     NSHashTable *_collectionEnumerators;
+    bool _sendingNotifications;
 }
 
 + (BOOL)isCoreDebug {
@@ -379,11 +381,18 @@ REALM_NOINLINE void RLMRealmTranslateException(NSError **error) {
 
 - (void)sendNotifications:(RLMNotification)notification {
     NSAssert(!_realm->config().read_only(), @"Read-only realms do not have notifications");
-
+    if (_sendingNotifications) {
+        return;
+    }
     NSUInteger count = _notificationHandlers.count;
     if (count == 0) {
         return;
     }
+
+    _sendingNotifications = true;
+    auto cleanup = realm::util::make_scope_exit([&]() noexcept {
+        _sendingNotifications = false;
+    });
 
     // call this realm's notification blocks
     if (count == 1) {
@@ -499,17 +508,17 @@ REALM_NOINLINE void RLMRealmTranslateException(NSError **error) {
 /**
  Replaces all string columns in this Realm with a string enumeration column and compacts the
  database file.
- 
+
  Cannot be called from a write transaction.
 
  Compaction will not occur if other `RLMRealm` instances exist.
- 
+
  While compaction is in progress, attempts by other threads or processes to open the database will
  wait.
- 
+
  Be warned that resource requirements for compaction is proportional to the amount of live data in
  the database.
- 
+
  Compaction works by writing the database contents to a temporary database file and then replacing
  the database with the temporary one. The name of the temporary file is formed by appending
  `.tmp_compaction_space` to the name of the database.
