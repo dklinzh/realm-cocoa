@@ -153,10 +153,6 @@ NSData *RLMRealmValidatedEncryptionKey(NSData *key) {
     _realm->set_auto_refresh(autorefresh);
 }
 
-+ (NSString *)writeableTemporaryPathForFile:(NSString *)fileName {
-    return [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
-}
-
 + (instancetype)defaultRealm {
     return [RLMRealm realmWithConfiguration:[RLMRealmConfiguration rawDefaultConfiguration] error:nil];
 }
